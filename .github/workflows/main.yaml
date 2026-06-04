@@ -1,18 +1,71 @@
-name: Build and Push Docker Image to ECR
+name: CI-CD Pipeline
 
 on:
   push:
     branches:
-      - main
+    - main
 
-env:
-  AWS_REGION: eu-north-1
-  ECR_REPOSITORY: studentperformance
+permissions:
+  contents: read
 
 jobs:
-  build-and-push:
+  integration:
+    name: Continuous Integration
     runs-on: ubuntu-latest
-
+  
+  
     steps:
-      - name: Checkout source code
+      - name: Checkout Code
         uses: actions/checkout@v4
+    
+      - name: Set Up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.8"
+    
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+    
+      - name: Integration Complete
+        run: echo "Continuous Integration Successful"
+    
+  
+  build-and-push-ecr-image:
+    name: Continuous Delivery
+    needs: integration
+    runs-on: ubuntu-latest
+  
+  
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+    
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+    
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+    
+      - name: Build Docker Image
+        run: docker build -t studentperformance .
+    
+      - name: Tag Docker Image
+        run: |
+          docker tag studentperformance:latest \
+          ${{ steps.login-ecr.outputs.registry }}/studentperformance:latest
+    
+      - name: Push Docker Image
+        run: |
+          docker push \
+          ${{ steps.login-ecr.outputs.registry }}/studentperformance:latest
+    
+      - name: Delivery Complete
+        run: echo "Docker image pushed successfully"
+    
